@@ -30,6 +30,7 @@ import (
 )
 
 func main() {
+	// 创建一个带有默认参数的Cobra Command对象
 	command := app.NewAPIServerCommand()
 	code := cli.Run(command)
 	os.Exit(code)
