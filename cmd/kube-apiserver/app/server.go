@@ -132,6 +132,7 @@ cluster's shared state through which all other components interact.`,
 			// 运行 API Server，同时设置信号处理程序
 			return Run(completedOptions, genericapiserver.SetupSignalHandler())
 		},
+		// 定义了命令的参数验证逻辑，确保不接受任何参数。
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
 				if len(arg) > 0 {
@@ -142,7 +143,9 @@ cluster's shared state through which all other components interact.`,
 		},
 	}
 
+	// 获取命令的标志集合，后续会将各个模块的标志添加到这里。
 	fs := cmd.Flags()
+	// 用于管理命令的各种标志和选项，包括全局标志和版本标志。
 	namedFlagSets := s.Flags()
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name(), logs.SkipLoggingConfigurationFlags())
@@ -151,6 +154,7 @@ cluster's shared state through which all other components interact.`,
 		fs.AddFlagSet(f)
 	}
 
+	// 设置用法和帮助函数，以根据终端窗口的大小动态调整显示。
 	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
 	cliflag.SetUsageAndHelpFunc(cmd, namedFlagSets, cols)
 
@@ -158,12 +162,15 @@ cluster's shared state through which all other components interact.`,
 }
 
 // Run runs the specified APIServer.  This should never exit.
+// 用于运行Kubernetes API Server
 func Run(opts options.CompletedOptions, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
+	// 记录信息
 	klog.Infof("Version: %+v", version.Get())
 
 	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
+	//
 	config, err := NewConfig(opts)
 	if err != nil {
 		return err
