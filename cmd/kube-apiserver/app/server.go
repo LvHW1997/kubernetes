@@ -235,14 +235,16 @@ func CreateProxyTransport() *http.Transport {
 }
 
 // CreateKubeAPIServerConfig creates all the resources for running the API server, but runs none of them
+// 创建用于运行 API 服务器的所有资源，但不运行任何资源
 func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	*controlplane.Config,
 	aggregatorapiserver.ServiceResolver,
 	[]admission.PluginInitializer,
 	error,
 ) {
+	// 创建代理传输
 	proxyTransport := CreateProxyTransport()
-
+	// 构建通用配置
 	genericConfig, versionedInformers, storageFactory, err := controlplaneapiserver.BuildGenericConfig(
 		opts.CompletedOptions,
 		[]*runtime.Scheme{legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme},
@@ -251,12 +253,13 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	if err != nil {
 		return nil, nil, nil, err
 	}
-
+	// 设置集群功能
 	capabilities.Setup(opts.AllowPrivileged, opts.MaxConnectionBytesPerSec)
-
+	// 应用度量配置
 	opts.Metrics.Apply()
+	// 注册 ServiceAccount 指标（
 	serviceaccount.RegisterMetrics()
-
+	// 创建控制平面配置对象
 	config := &controlplane.Config{
 		GenericConfig: genericConfig,
 		ExtraConfig: controlplane.ExtraConfig{
@@ -287,6 +290,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		},
 	}
 
+	// 配置认证信息
 	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
 		config.ExtraConfig.PeerEndpointLeaseReconciler, err = controlplaneapiserver.CreatePeerEndpointLeaseReconciler(*genericConfig, storageFactory)
 		if err != nil {
@@ -319,13 +323,14 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderGroupHeaders = requestHeaderConfig.GroupHeaders
 		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderUsernameHeaders = requestHeaderConfig.UsernameHeaders
 	}
-
+	// 配置云提供程序
 	err = validateCloudProviderOptions(opts.CloudProvider)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to validate cloud provider: %w", err)
 	}
 
 	// setup admission
+	// 设置 Admission 控制
 	admissionConfig := &kubeapiserveradmission.Config{
 		ExternalInformers:    versionedInformers,
 		LoopbackClientConfig: genericConfig.LoopbackClientConfig,

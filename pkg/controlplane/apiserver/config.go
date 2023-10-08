@@ -55,6 +55,7 @@ import (
 )
 
 // BuildGenericConfig takes the master server options and produces the genericapiserver.Config associated with it
+// 创建通用配置
 func BuildGenericConfig(
 	s controlplaneapiserver.CompletedOptions,
 	schemes []*runtime.Scheme,
@@ -66,9 +67,11 @@ func BuildGenericConfig(
 
 	lastErr error,
 ) {
+	// 创建通用配置对象，并初始化一些配置
 	genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs)
 	genericConfig.MergedResourceConfig = controlplane.DefaultAPIResourceConfigSource()
 
+	// 使用 ApplyTo 方法将不同配置项应用到 genericConfig 中，这些配置项包括通信安全配置（genericConfig.SecureServing）、特性配置（genericConfig.Features）、API 启用配置（genericConfig.APIEnablement）等
 	if lastErr = s.GenericServerRunOptions.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
@@ -91,6 +94,7 @@ func BuildGenericConfig(
 		}
 	}
 	// wrap the definitions to revert any changes from disabled features
+	// 配置 OpenAPI 和 OpenAPI V3 的定义信息，这些信息用于文档生成和自动化客户端生成。
 	getOpenAPIDefinitions = openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(getOpenAPIDefinitions)
 	namer := openapinamer.NewDefinitionNamer(schemes...)
 	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(getOpenAPIDefinitions, namer)
@@ -98,14 +102,17 @@ func BuildGenericConfig(
 	genericConfig.OpenAPIV3Config = genericapiserver.DefaultOpenAPIV3Config(getOpenAPIDefinitions, namer)
 	genericConfig.OpenAPIV3Config.Info.Title = "Kubernetes"
 
+	// 配置长时间运行请求的检查，这些请求包括监视（watch）、代理（proxy）等。
 	genericConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
 		sets.NewString("watch", "proxy"),
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
 	)
 
+	// 配置 Kubernetes 版本信息。
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
 
+	// 配置存储工厂（storageFactory），用于持久化数据的存储引擎。
 	if genericConfig.EgressSelector != nil {
 		s.Etcd.StorageConfig.Transport.EgressLookup = genericConfig.EgressSelector.Lookup
 	}
@@ -129,12 +136,15 @@ func BuildGenericConfig(
 	// Since not every generic apiserver has to support protobufs, we
 	// cannot default to it in generic apiserver and need to explicitly
 	// set it in kube-apiserver.
+	// 配置循环回环客户端（LoopbackClientConfig）的内容类型为 Protobuf，并禁用了通信时的压缩
 	genericConfig.LoopbackClientConfig.ContentConfig.ContentType = "application/vnd.kubernetes.protobuf"
 	// Disable compression for self-communication, since we are going to be
 	// on a fast local network
 	genericConfig.LoopbackClientConfig.DisableCompression = true
 
+	// 创建客户端配置（kubeClientConfig），用于与 Kubernetes 集群通信
 	kubeClientConfig := genericConfig.LoopbackClientConfig
+	// 创建 Kubernetes 客户端集合（clientgoExternalClient）和 Shared Informer 工厂（versionedInformers），Shared Informer 用于监听 Kubernetes 资源对象的变化
 	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeClientConfig)
 	if err != nil {
 		lastErr = fmt.Errorf("failed to create real external clientset: %v", err)
@@ -143,10 +153,12 @@ func BuildGenericConfig(
 	versionedInformers = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
 
 	// Authentication.ApplyTo requires already applied OpenAPIConfig and EgressSelector if present
+	// 应用身份认证配置（Authentication）到 genericConfig.Authentication，包括安全配置、出口选择器（Egress Selector）等。
 	if lastErr = s.Authentication.ApplyTo(&genericConfig.Authentication, genericConfig.SecureServing, genericConfig.EgressSelector, genericConfig.OpenAPIConfig, genericConfig.OpenAPIV3Config, clientgoExternalClient, versionedInformers); lastErr != nil {
 		return
 	}
 
+	// 构建授权相关的配置，包括授权器、规则解析器等。
 	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, genericConfig.EgressSelector, versionedInformers)
 	if err != nil {
 		lastErr = fmt.Errorf("invalid authorization config: %v", err)
@@ -155,16 +167,17 @@ func BuildGenericConfig(
 	if s.Authorization != nil && !sets.NewString(s.Authorization.Modes...).Has(modes.ModeRBAC) {
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
-
+	// 应用审计配置（Audit）到 genericConfig 中
 	lastErr = s.Audit.ApplyTo(genericConfig)
 	if lastErr != nil {
 		return
 	}
 
+	// 如果启用了 API 优先级和公平性特性，配置流量控制（Flow Control）。
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && s.GenericServerRunOptions.EnablePriorityAndFairness {
 		genericConfig.FlowControl, lastErr = BuildPriorityAndFairness(s, clientgoExternalClient, versionedInformers)
 	}
-
+	// 如果启用了聚合发现终端特性，配置聚合资源管理器（AggregatedDiscoveryGroupManager）。
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		genericConfig.AggregatedDiscoveryGroupManager = aggregated.NewResourceManager("apis")
 	}
