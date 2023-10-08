@@ -131,7 +131,9 @@ func (cfg *Config) Complete() CompletedConfig {
 }
 
 // New returns a new instance of CustomResourceDefinitions from the given config.
+// 返回一个 CRD 实例
 func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*CustomResourceDefinitions, error) {
+	// 创建一个泛型 API 服务器，它用于处理自定义资源定义的请求。
 	genericServer, err := c.GenericConfig.New("apiextensions-apiserver", delegationTarget)
 	if err != nil {
 		return nil, err
@@ -139,6 +141,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 	// hasCRDInformerSyncedSignal is closed when the CRD informer this server uses has been fully synchronized.
 	// It ensures that requests to potential custom resource endpoints while the server hasn't installed all known HTTP paths get a 503 error instead of a 404
+	// 用于等待 CRD Informer 同步完成的信号。CRD Informer 用于跟踪 Kubernetes 中已定义的自定义资源。
 	hasCRDInformerSyncedSignal := make(chan struct{})
 	if err := genericServer.RegisterMuxAndDiscoveryCompleteSignal("CRDInformerHasNotSynced", hasCRDInformerSyncedSignal); err != nil {
 		return nil, err
@@ -149,7 +152,9 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	apiResourceConfig := c.GenericConfig.MergedResourceConfig
+	// 包含自定义资源的 API 组信息。
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiextensions.GroupName, Scheme, metav1.ParameterCodec, Codecs)
+	// 存储映射，用于存储自定义资源的存储配置。
 	storage := map[string]rest.Storage{}
 	// customresourcedefinitions
 	if resource := "customresourcedefinitions"; apiResourceConfig.ResourceEnabled(v1.SchemeGroupVersion.WithResource(resource)) {
@@ -163,7 +168,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	if len(storage) > 0 {
 		apiGroupInfo.VersionedResourcesStorageMap[v1.SchemeGroupVersion.Version] = storage
 	}
-
+	// 将自定义资源定义添加到 API 服务器中。
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return nil, err
 	}
