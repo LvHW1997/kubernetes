@@ -80,7 +80,9 @@ func init() {
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 // 返回一个带有默认参数的*cobra.Command对象
 func NewAPIServerCommand() *cobra.Command {
+	// 创建一个 ServerRunOptions 类型的对象 s，用于存储 API Server 的运行参数和配置
 	s := options.NewServerRunOptions()
+	// 创建一个 Cobra 命令对象
 	cmd := &cobra.Command{
 		Use: "kube-apiserver",
 		Long: `The Kubernetes API server validates and configures data
@@ -89,36 +91,45 @@ others. The API Server services REST operations and provides the frontend to the
 cluster's shared state through which all other components interact.`,
 
 		// stop printing usage when the command errors
+		// 命令发生错误时不显示用法帮助信息
 		SilenceUsage: true,
+		// 在运行命令之前执行的函数，用于执行一些初始化操作，例如禁用 client-go 库的警告日志。
 		PersistentPreRunE: func(*cobra.Command, []string) error {
 			// silence client-go warnings.
 			// kube-apiserver loopback clients should not log self-issued warnings.
 			rest.SetDefaultWarningHandler(rest.NoWarnings{})
 			return nil
 		},
+		// 命令的实际运行逻辑
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// 检查是否需要打印版本信息并退出。
 			verflag.PrintAndExitIfRequested()
 			fs := cmd.Flags()
 
 			// Activate logging as soon as possible, after that
 			// show flags with the final logging configuration.
+			// 激活日志记录，并根据最终的日志配置打印命令行标志。
 			if err := logsapi.ValidateAndApply(s.Logs, utilfeature.DefaultFeatureGate); err != nil {
 				return err
 			}
 			cliflag.PrintFlags(fs)
 
 			// set default options
+			// 设置默认选项并完成选项的配置。
 			completedOptions, err := s.Complete()
 			if err != nil {
 				return err
 			}
 
 			// validate options
+			// 验证配置选项，如果存在错误则返回错误。
 			if errs := completedOptions.Validate(); len(errs) != 0 {
 				return utilerrors.NewAggregate(errs)
 			}
 			// add feature enablement metrics
+			// 添加功能启用度量指标
 			utilfeature.DefaultMutableFeatureGate.AddMetrics()
+			// 运行 API Server，同时设置信号处理程序
 			return Run(completedOptions, genericapiserver.SetupSignalHandler())
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
