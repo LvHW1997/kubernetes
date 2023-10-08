@@ -170,15 +170,17 @@ func Run(opts options.CompletedOptions, stopCh <-chan struct{}) error {
 
 	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
-	//
+	// 创建配置文件
 	config, err := NewConfig(opts)
 	if err != nil {
 		return err
 	}
+	// 完成配置
 	completed, err := config.Complete()
 	if err != nil {
 		return err
 	}
+	// 创建服务链
 	server, err := CreateServerChain(completed)
 	if err != nil {
 		return err
@@ -194,19 +196,23 @@ func Run(opts options.CompletedOptions, stopCh <-chan struct{}) error {
 
 // CreateServerChain creates the apiservers connected via delegation.
 func CreateServerChain(config CompletedConfig) (*aggregatorapiserver.APIAggregator, error) {
+	// 用于处理请求中的未知路径（404 Not Found），根据请求的路径返回适当的错误响应。
 	notFoundHandler := notfoundhandler.New(config.ControlPlane.GenericConfig.Serializer, genericapifilters.NoMuxAndDiscoveryIncompleteKey)
+	// 创建了一个用于处理 CustomResourceDefinition（CRD）和其他扩展资源的 API Server apiExtensionsServer
 	apiExtensionsServer, err := config.ApiExtensions.New(genericapiserver.NewEmptyDelegateWithCustomHandler(notFoundHandler))
 	if err != nil {
 		return nil, err
 	}
+	// 检查是否启用了 CRD API
 	crdAPIEnabled := config.ApiExtensions.GenericConfig.MergedResourceConfig.ResourceEnabled(apiextensionsv1.SchemeGroupVersion.WithResource("customresourcedefinitions"))
-
+	// 创建了一个用于处理内置资源的 Kubernetes API Server kubeAPIServer
 	kubeAPIServer, err := config.ControlPlane.New(apiExtensionsServer.GenericAPIServer)
 	if err != nil {
 		return nil, err
 	}
 
 	// aggregator comes last in the chain
+	// 创建了一个聚合 API Server aggregatorServer，它位于 API Server 链的最后。它负责处理聚合请求，将请求路由到相应的组件上，并提供整体的聚合功能。
 	aggregatorServer, err := createAggregatorServer(config.Aggregator, kubeAPIServer.GenericAPIServer, apiExtensionsServer.Informers, crdAPIEnabled)
 	if err != nil {
 		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
