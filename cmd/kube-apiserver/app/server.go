@@ -190,7 +190,7 @@ func Run(opts options.CompletedOptions, stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
-
+	// 启动 API Server，并将停止信号 (stopCh) 传递给 API Server 实例，以便在需要停止时能够优雅地关闭 API Server
 	return prepared.Run(stopCh)
 }
 
