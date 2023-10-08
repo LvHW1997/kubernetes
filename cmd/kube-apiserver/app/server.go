@@ -72,6 +72,7 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
+// 将默认的特性门配置添加到程序中，以控制程序的一些功能开关状态
 func init() {
 	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
