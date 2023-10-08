@@ -78,6 +78,7 @@ func init() {
 }
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
+// 返回一个带有默认参数的*cobra.Command对象
 func NewAPIServerCommand() *cobra.Command {
 	s := options.NewServerRunOptions()
 	cmd := &cobra.Command{
