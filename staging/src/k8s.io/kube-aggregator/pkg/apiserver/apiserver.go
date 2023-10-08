@@ -397,8 +397,11 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 
 // PrepareRun prepares the aggregator to run, by setting up the OpenAPI spec &
 // aggregated discovery document and calling the generic PrepareRun.
+// 准备 API 聚合器（APIAggregator）运行
 func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 	// add post start hook before generic PrepareRun in order to be before /healthz installation
+	// 注册了多个 PostStart 钩子，这些钩子在 API Server 启动后执行。这些钩子用于启动不同的控制器和服务，以准备 API 聚合器运行。
+	// 钩子 "apiservice-openapi-controller" 和 "apiservice-openapiv3-controller" 用于启动 OpenAPI 相关的控制器。这些控制器负责生成和提供 API 的 OpenAPI 规范，使客户端能够了解 API 的可用端点和数据结构。
 	if s.openAPIConfig != nil {
 		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
 			go s.openAPIAggregationController.Run(context.StopCh)
@@ -412,7 +415,7 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 			return nil
 		})
 	}
-
+	// 用于设置 API Server 的发现机制，以便客户端能够发现和探测可用的 API 服务。
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		s.discoveryAggregationController = NewDiscoveryManager(
 			// Use aggregator as the source name to avoid overwriting native/CRD
@@ -428,7 +431,7 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 			return nil
 		})
 	}
-
+	// 准备通用 API 服务器（GenericAPIServer）运行
 	prepared := s.GenericAPIServer.PrepareRun()
 
 	// delay OpenAPI setup until the delegate had a chance to setup their OpenAPI handlers

@@ -185,7 +185,7 @@ func Run(opts options.CompletedOptions, stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
-
+	// 准备 API 聚合器（APIAggregator）运行
 	prepared, err := server.PrepareRun()
 	if err != nil {
 		return err

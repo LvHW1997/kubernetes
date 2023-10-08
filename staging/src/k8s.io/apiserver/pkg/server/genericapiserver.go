@@ -420,15 +420,17 @@ type preparedGenericAPIServer struct {
 }
 
 // PrepareRun does post API installation setup steps. It calls recursively the same function of the delegates.
+// 准备通用 API 服务器（GenericAPIServer）运行
 func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	s.delegationTarget.PrepareRun()
 
+	// 安装 OpenAPI V2 规范
 	if s.openAPIConfig != nil && !s.skipOpenAPIInstallation {
 		s.OpenAPIVersionedService, s.StaticOpenAPISpec = routes.OpenAPI{
 			Config: s.openAPIConfig,
 		}.InstallV2(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
 	}
-
+	// 安装 OpenAPI V3 规范
 	if s.openAPIV3Config != nil && !s.skipOpenAPIInstallation {
 		if utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV3) {
 			s.OpenAPIV3VersionedService = routes.OpenAPI{
@@ -436,7 +438,7 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 			}.InstallV3(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
 		}
 	}
-
+	// 用于安装健康检查和活动检查的端点。这些端点用于检查 API 服务器的状态和可用性。
 	s.installHealthz()
 	s.installLivez()
 
@@ -446,6 +448,7 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	if err != nil {
 		klog.Errorf("Failed to install readyz shutdown check %s", err)
 	}
+	// 用于安装就绪检查的端点，以检查 API 服务器是否已准备好处理请求。
 	s.installReadyz()
 
 	return preparedGenericAPIServer{s}
