@@ -279,7 +279,9 @@ func GetResourceKind(groupVersion schema.GroupVersion, storage rest.Storage, typ
 	return fqKindToRegister, nil
 }
 
+// 将每种资源的访问路径及其后端存储的操作对应起来
 func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService) (*metav1.APIResource, *storageversion.ResourceInfo, error) {
+	// 准入控制
 	admit := a.group.Admit
 
 	optionsExternalVersion := a.group.GroupVersion
@@ -287,11 +289,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		optionsExternalVersion = *a.group.OptionsExternalVersion
 	}
 
+	// 检查给定的存储路径是否是子资源的路径，并返回资源和子资源组件
 	resource, subresource, err := splitSubresource(path)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	// 获取 API 资源的 Group、Version、Kind 以及是否是子资源
 	group, version := a.group.GroupVersion.Group, a.group.GroupVersion.Version
 
 	fqKindToRegister, err := GetResourceKind(a.group.GroupVersion, storage, a.group.Typer)
@@ -308,6 +312,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	isSubresource := len(subresource) > 0
 
 	// If there is a subresource, namespace scoping is defined by the parent resource
+	// 如果存在子资源，则命名空间范围由父资源定义
 	var namespaceScoped bool
 	if isSubresource {
 		parentStorage, ok := a.group.Storage[resource]
@@ -329,6 +334,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	// what verbs are supported by the storage, used to know what verbs we support per path
+	// 存储支持哪些动词，用于了解每个路径支持哪些动词
 	creater, isCreater := storage.(rest.Creater)
 	namedCreater, isNamedCreater := storage.(rest.NamedCreater)
 	lister, isLister := storage.(rest.Lister)
