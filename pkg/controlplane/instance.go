@@ -362,22 +362,25 @@ func (c *Config) Complete() CompletedConfig {
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
 // KubeletClientConfig
+// 创建 Kubernetes API Server 实例，并对其进行配置
 func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*Instance, error) {
+	// 检查 KubeletClientConfig 是否为空
 	if reflect.DeepEqual(c.ExtraConfig.KubeletClientConfig, kubeletclient.KubeletClientConfig{}) {
 		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
 	}
-
+	// 创建一个 genericapiserver.Server 实例（命名为 s），并使用 c.GenericConfig 中的配置对其进行初始化
 	s, err := c.GenericConfig.New("kube-apiserver", delegationTarget)
 	if err != nil {
 		return nil, err
 	}
-
+	// 安装日志
 	if c.ExtraConfig.EnableLogsSupport {
 		routes.Logs{}.Install(s.Handler.GoRestfulContainer)
 	}
 
 	// Metadata and keys are expected to only change across restarts at present,
 	// so we just marshal immediately and serve the cached JSON bytes.
+	// 创建 OpenID Connect 元数据（metadata）以供服务帐户使用，并根据配置将其提供给 REST 端点
 	md, err := serviceaccount.NewOpenIDMetadata(
 		c.ExtraConfig.ServiceAccountIssuerURL,
 		c.ExtraConfig.ServiceAccountJWKSURI,
@@ -406,12 +409,12 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		routes.NewOpenIDMetadataServer(md.ConfigJSON, md.PublicKeysetJSON).
 			Install(s.Handler.GoRestfulContainer)
 	}
-
+	// 创建 Instance 实例（命名为 m），并设置 GenericAPIServer 和 ClusterAuthenticationInfo 字段
 	m := &Instance{
 		GenericAPIServer:          s,
 		ClusterAuthenticationInfo: c.ExtraConfig.ClusterAuthenticationInfo,
 	}
-
+	// 创建 Kubernetes 客户端（clientset）以与 Kubernetes 集群通信
 	clientset, err := kubernetes.NewForConfig(c.GenericConfig.LoopbackClientConfig)
 	if err != nil {
 		return nil, err
@@ -420,6 +423,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// TODO: update to a version that caches success but will recheck on failure, unlike memcache discovery
 	discoveryClientForAdmissionRegistration := clientset.Discovery()
 
+	// 创建 REST 存储提供程序（restStorageProviders），并将其传递给 InstallAPIs 方法，用于注册 REST 资源
 	legacyRESTStorageProvider, err := corerest.New(corerest.Config{
 		GenericConfig: corerest.GenericConfig{
 			StorageFactory:              c.ExtraConfig.StorageFactory,
@@ -480,7 +484,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	if err := m.InstallAPIs(c.ExtraConfig.APIResourceConfigSource, c.GenericConfig.RESTOptionsGetter, restStorageProviders...); err != nil {
 		return nil, err
 	}
-
+	// 添加用于启动系统命名空间控制器（systemnamespaces.NewController）的后启动挂钩。
 	m.GenericAPIServer.AddPostStartHookOrDie("start-system-namespaces-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 		go systemnamespaces.NewController(clientset, c.ExtraConfig.VersionedInformers.Core().V1().Namespaces()).Run(hookContext.StopCh)
 		return nil
@@ -490,6 +494,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get listener address: %w", err)
 	}
+	// 创建 Kubernetes 服务控制器（kubernetesservice.New）并添加用于启动的后启动挂钩。
 	kubernetesServiceCtrl := kubernetesservice.New(kubernetesservice.Config{
 		PublicIP: c.GenericConfig.PublicAddress,
 
@@ -509,7 +514,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		kubernetesServiceCtrl.Stop()
 		return nil
 	})
-
+	// 如果启用了 Unknown Version Interoperability Proxy（未知版本互操作代理），则添加用于启动对等端点的租约控制器（peerreconcilers.New）和用于等待缓存同步的后启动挂钩。
 	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
 		peeraddress := getPeerAddress(c.ExtraConfig.PeerAdvertiseAddress, c.GenericConfig.PublicAddress, publicServicePort)
 		peerEndpointCtrl := peerreconcilers.New(
@@ -572,7 +577,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		go controller.Run(ctx, 1)
 		return nil
 	})
-
+	// 如果启用了 API Server Identity，添加租约控制器和租约垃圾收集器的后启动挂钩。
 	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.APIServerIdentity) {
 		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 			kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
@@ -618,7 +623,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			return nil
 		})
 	}
-
+	// 添加用于启动旧令牌跟踪控制器（legacytokentracking.NewController）的后启动挂钩。
 	m.GenericAPIServer.AddPostStartHookOrDie("start-legacy-token-tracking-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 		kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
 		if err != nil {
