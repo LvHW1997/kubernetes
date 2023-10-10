@@ -44,6 +44,7 @@ func StorageWithCacher() generic.StorageDecorator {
 		triggerFuncs storage.IndexerFuncs,
 		indexers *cache.Indexers) (storage.Interface, factory.DestroyFunc, error) {
 
+		// 创建一个裸的ETCD存储借口实例
 		s, d, err := generic.NewRawStorage(storageConfig, newFunc, newListFunc, resourcePrefix)
 		if err != nil {
 			return s, d, err
@@ -66,11 +67,13 @@ func StorageWithCacher() generic.StorageDecorator {
 			Indexers:       indexers,
 			Codec:          storageConfig.Codec,
 		}
+		// 基于裸ETCD存储实例创建带缓存能力的存储
 		cacher, err := cacherstorage.NewCacherFromConfig(cacherConfig)
 		if err != nil {
 			return nil, func() {}, err
 		}
 		var once sync.Once
+		// 用于释放存储本身的资源
 		destroyFunc := func() {
 			once.Do(func() {
 				cacher.Stop()
